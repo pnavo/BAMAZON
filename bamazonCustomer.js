@@ -1,7 +1,11 @@
 var mysql = require("mysql");
 var inquirer = require("inquirer");
-require("console.table");
+var Table = require("cli-table");
 
+var table = new Table({
+    head: ['ID', 'Product', 'Dept', 'Price', 'Qty'],
+    colWidths: [7, 40, 30, 10, 10]
+});
 
 // Creating the connection information for the sql database
 var connection = mysql.createConnection({
@@ -34,7 +38,7 @@ function start() {
       }else if(answer.select.toUpperCase() === "PLACE ITEM UP FOR SALE") {
         sell();
       }else if(answer.select.toUpperCase() === "BUY SOMETHING"){
-      	buy();
+      	buyItem();
       }else{
       	exit()
       }
@@ -42,15 +46,80 @@ function start() {
 }
 
 function postInventory(){
-  inquirer
-	.prompt({
-		name:"inventory",
-		type
+
+	connection.query("SELECT * FROM products", function(err, res){
+		if(err) throw err;
+		for(var i = 0; i < res.length; i++){
+			table.push([res[i].id, res[i].product_name, res[i].category, '$' + res[i].price, res[i].stock_quantity]);
+		};
+
+		console.log(table.res);
+		start();
 	})
+
 }
 
-function buy(){
+function buyItem(){
+	 inquirer.prompt([
+        {
+            name: "purchase",
+            message: "Which product would you like to purchase?",
+            type: "input",
+            validate: function(input){
+                var check = input.replace(/\D/g, "");
+                if (!input || parseInt(input) > items.length || check === "") {
+                    return false
+                } else {
+                    return true
+                }
+            }
+        },
+        {
+            name: "quantity",
+            message: "How many would you like?",
+            type: "input",
+            validate: function(input){
+                var check = input.replace(/\D/g, "");
+                if (!input || check === "") {
+                    return false
+                } else {
+                    return true
+                }
+            }
+        }
+    ]).then(function(response) {
+        // checks to see if the value the customer wants is in stock
+        var chosenItem = response.purchase -1;
+        var amount = parseInt(response.quantity)
+        var item = items[chosenItem];
 
+        if (parseInt(amount) > item.stock_quantity) {
+            console.log("Insufficient inventory in stock, please select a smaller quantity.");
+            letsShop(items)
+        } else {
+            console.log("Your total is: " + item.price * response.quantity)
+            connection.query("UPDATE products SET stock_quantity = ? WHERE id = ?", [parseInt(item.stock_quantity) - parseInt(response.quantity), item.id], function(err) {
+                if (err) throw err;
+            })
+            // Redirects the user to try again
+            inquirer.prompt([
+                {
+                    name: "again",
+                    message: "Would you like to buy something else?",
+                    type: "confirm",
+                    default:false
+                }
+            ]).then(function(response) {
+                switch(response.again){
+                    case true:
+                        buyItem()
+                    break;
+                    case false:
+                    	exit();
+                }
+            })
+        }
+    })
 }
 
 function sell(){
@@ -82,14 +151,15 @@ function sell(){
       	type: "input",
       	message: "How many would you like to sell?",
       	validate: function(value) {
-      		if(isNan(value) === false){
-      			return true;
-      		}
-      		return false;
-      	}
+          if (isNaN(value) === false) {
+            return true;
+          }
+          return false;
+        }
       }
     ])
     .then(function(answer) {
+    	console.log(answer.quantity);
     	//Inserting data into the table based on answers provided
       connection.query(
         "INSERT INTO products SET ?",
@@ -97,13 +167,18 @@ function sell(){
           product_name: answer.product,
           category: answer.category,
           price: answer.price,
-          quantity: answer.quantity
+          stock_quantity: answer.quantity
         },
         function(err) {
           if (err) throw err;
-          console.log("Your " + answer.product + "is now available for purchase!");
+          console.log("Your " + answer.product + " is now available for purchase!");
           start();
         }
       );
     });
+}
+function exit(){
+	console.log("Come back soon!")
+	process.exit(0);
+
 }
