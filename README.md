@@ -8,4 +8,4 @@ Exit the app
 Check inventory
 Purchase from existing inventory
 
-![terminal 1](https://github.com/pnavo/BAMAZON/blob/master/images/sell.JPG "Sell items")
+![terminal 1](images/sell.png)
