@@ -2,10 +2,10 @@ var mysql = require("mysql");
 var inquirer = require("inquirer");
 var Table = require("cli-table");
 
-var table = new Table({
-    head: ['ID', 'Product', 'Dept', 'Price', 'Qty'],
-    colWidths: [7, 40, 30, 10, 10]
-});
+// var table = new Table({
+//     head: ['ID', 'Product', 'Dept', 'Price', 'Qty'],
+//     colWidths: [7, 40, 30, 10, 10]
+// });
 
 // Creating the connection information for the sql database
 var connection = mysql.createConnection({
@@ -47,79 +47,82 @@ function start() {
 
 function postInventory(){
 
-	connection.query("SELECT * FROM products", function(err, res){
-		if(err) throw err;
-		for(var i = 0; i < res.length; i++){
-			table.push([res[i].id, res[i].product_name, res[i].category, '$' + res[i].price, res[i].stock_quantity]);
-		};
+	connection.query('SELECT * FROM products', function(err, res) {
+    var table = new Table({
+      head: ['Item ID', 'Product', 'Department', 'Price', 'Stock Qty'],
+      colWidths: [10, 35, 30, 10, 12]
+    });
 
-		console.log(table.res);
-		start();
-	})
+    for (var i = 0; i < res.length; i++) {
+      table.push(
+        [res[i].id, res[i].product_name, res[i].category,
+        res[i].price, res[i].stock_quantity]);
+    }
+
+    console.log(table.toString());
+    start();
+  });
 
 }
 
 function buyItem(){
-	 inquirer.prompt([
-        {
-            name: "purchase",
-            message: "Which product would you like to purchase?",
-            type: "input",
-            validate: function(input){
-                var check = input.replace(/\D/g, "");
-                if (!input || parseInt(input) > items.length || check === "") {
-                    return false
-                } else {
-                    return true
-                }
-            }
-        },
-        {
-            name: "quantity",
-            message: "How many would you like?",
-            type: "input",
-            validate: function(input){
-                var check = input.replace(/\D/g, "");
-                if (!input || check === "") {
-                    return false
-                } else {
-                    return true
-                }
-            }
-        }
-    ]).then(function(response) {
-        // checks to see if the value the customer wants is in stock
-        var chosenItem = response.purchase -1;
-        var amount = parseInt(response.quantity)
-        var item = items[chosenItem];
+	   inquirer.prompt([
+    { 
+		type: 'input', //default type is input if type left out
+		message: 'Which product would you like to purchase? [ID]',
+		name: 'productID'
+    },
+    { 
+		type: 'input', //default type is input if type left out
+		message: 'How many would you like to purchase?',
+		name: 'quantityToBuy'
+    }
+	]).then(function(answer) {
+    var query = "SELECT * FROM products WHERE ?";
+    connection.query(query, { id: answer.productID }, function(err, res) {
+      if (err) throw err;
 
-        if (parseInt(amount) > item.stock_quantity) {
-            console.log("Insufficient inventory in stock, please select a smaller quantity.");
-            letsShop(items)
-        } else {
-            console.log("Your total is: " + item.price * response.quantity)
-            connection.query("UPDATE products SET stock_quantity = ? WHERE id = ?", [parseInt(item.stock_quantity) - parseInt(response.quantity), item.id], function(err) {
-                if (err) throw err;
-            })
-            // Redirects the user to try again
-            inquirer.prompt([
-                {
-                    name: "again",
-                    message: "Would you like to buy something else?",
-                    type: "confirm",
-                    default:false
-                }
-            ]).then(function(response) {
-                switch(response.again){
-                    case true:
-                        buyItem()
-                    break;
-                    case false:
-                    	exit();
-                }
-            })
-        }
-    })
+      if (parseInt(answer.quantityToBuy) > res[0].stock_quantity) {
+        console.log('Insufficient quantity, please select fewer');
+        buyItem();
+      }
+      else {
+        var itemTable = new Table({
+          head: ['Item ID', 'Product', 'Department', 'Price', 'Stock Qty'],
+          colWidths: [10, 35, 30, 10, 12]
+        });
+
+        connection.query(
+          "UPDATE products SET ? WHERE ?",
+          [
+            {
+              stock_quantity: res[0].stock_quantity - parseInt(answer.quantityToBuy)
+            },
+            {
+              id: answer.productID
+            }
+          ],
+          function(error) {
+            if (error) throw error;
+            var totalCost = answer.quantityToBuy * res[0].price;
+
+            console.log("Item purchased successfully!");
+            connection.query(query, { id: answer.productID }, function(err, res) {
+              if (err) throw err;
+              itemTable.push(
+              [res[0].id, res[0].product_name, res[0].category,
+              res[0].price, res[0].stock_quantity]);
+
+              console.log(itemTable.toString());
+              console.log('Your total comes out to be $' + totalCost.toString() +
+                '\nThank you for shopping with us!')
+              start();
+            });
+          }
+        );
+      }      
+    });
+  });
 }
 
 function sell(){
