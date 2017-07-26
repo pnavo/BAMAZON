@@ -9,3 +9,4 @@ Check inventory
 Purchase from existing inventory
 
 ![terminal 1](images/sell.png)
+![terminal 1](images/overview.png)

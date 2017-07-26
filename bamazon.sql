@@ -11,5 +11,3 @@ CREATE TABLE products(
   stock_quantity INT(10) NOT NULL,
   PRIMARY KEY (id)
 );
-
-SELECT * FROM products;
